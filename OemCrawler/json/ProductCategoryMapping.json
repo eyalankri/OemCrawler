@@ -1,0 +1,8 @@
+﻿{
+  "product_category_mapping": {
+    "product_id": {product-id},
+    "category_id": {category-id},
+    "is_featured_product": false,
+    "display_order": 1
+  }
+}

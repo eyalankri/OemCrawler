@@ -1,0 +1,7 @@
+﻿{
+  "product": {
+    "name": "{part-name}",   
+    "sku": "{sku}",   
+    "price": {price}
+  }
+}

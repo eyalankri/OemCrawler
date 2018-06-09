@@ -1,0 +1,20 @@
+﻿{
+  "category": {
+    "name": "{category-name}",
+    "localized_names": [
+      {
+        "language_id": 1,
+        "localized_name": "{category-name}"
+      }
+    ],
+    "description": null,
+    "category_template_id": 1,
+    "parent_category_id": {parent-category-id},
+    "page_size": 6,
+    "page_size_options": "6, 3, 9",
+    "show_on_home_page": false,
+    "include_in_top_menu": false,
+    "published": true,
+    "deleted": false   
+  }
+}
