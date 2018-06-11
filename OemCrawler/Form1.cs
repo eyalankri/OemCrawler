@@ -4,7 +4,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using HtmlAgilityPack;
 
@@ -14,12 +16,12 @@ namespace OemCrawler
 
     public partial class Form1 : Form
     {
-        private  Models _model;       
+        private readonly Models _model;
         private string _htmlCode = "";
         private HtmlAgilityPack.HtmlDocument _htmlAgilityDoc;
         public int CategoryId;
-        private int _totalPartCounter;
         private int _brandCategoryId;
+        private string _lastStoppedMichlolName;
 
 
         public Form1()
@@ -27,17 +29,21 @@ namespace OemCrawler
             InitializeComponent();
             _model = new Models();
             _htmlAgilityDoc = new HtmlAgilityPack.HtmlDocument();
-           
-
         }
+
+
+
+
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            
             var comboSource = new Dictionary<int, string>
             {
                 { 0, "-- בחר קטגוריה --" },
-                { 5, "אופנועים -> סוזוקי" },
-                { 1024, "אופנועים -> הוסקוורנה" }
+                { 2, "אופנועים -> סוזוקי" },
+                { 1242, "אופנועים -> הוסקוורנה" },
+                //{ 1024, "אופנועים -> הוסקוורנה" }
             };
 
             cmbCategory.DataSource = new BindingSource(comboSource, null);
@@ -47,6 +53,19 @@ namespace OemCrawler
 
         private void btnGo_Click(object sender, EventArgs e)
         {
+            _lastStoppedMichlolName = txtLastStoppedMichlolName.Text.Trim().ToLower();
+
+            if (txtUrl.TextLength < 10)
+            {
+                MessageBox.Show(@"יש להכניס URL");
+                return;
+            }
+
+            if (!IsApiOnline())
+            {
+                MessageBox.Show(@"Api is not online!");
+                return;
+            }
 
             _brandCategoryId = int.Parse(cmbCategory.SelectedValue.ToString());
 
@@ -72,73 +91,33 @@ namespace OemCrawler
                 }
                 catch (WebException)
                 {
-                    System.Threading.Thread.Sleep(3000);
+                    Thread.Sleep(3000);
                     _htmlCode = client.DownloadString(txtUrl.Text.Trim());
                 }
 
             }
 
+            ThreadPool.QueueUserWorkItem(StartScrap);
+
+
+            
+
+        }
+
+
+
+
+        private void StartScrap(object state)
+        {
+            Console.Clear();
+
             ScrapModelPage(); // scrap model page
             GetMichlolNameAndUrl(); // from model page
             ScrapMichlolPages(); // get the parts
             InsertToDb();
+            Console.WriteLine(@"-----------> DoWork finished! <------------");
 
 
-
-            btnGo.Text = @"Go";
-        }
-
-        private void InsertToDb()
-        {            
-
-            var service = new Services(txtToken.Text);
-
-            int parentId = 0;
-
-            // model name:             
-            var category = service.IsCategoryExists(_model.Name, _brandCategoryId); // this func return checks if this cat exists and return it's parentId
-            if (!category.IsCategoryExists)  
-            {
-                // insert & get CatId
-                category.Id = service.CategoryInsert(_model.Name, _brandCategoryId,""); // the model takes the catId from combobox
-            }
-            parentId = category.Id;
-
-         
-
-
-
-            // model year           
-            category = service.IsCategoryExists(_model.Year, category.ParentCategoryId); // this func return checks if this cat exists and return it's parentId
-            if (!category.IsCategoryExists)
-            {
-                category.Id = service.CategoryInsert(_model.Year, category.ParentCategoryId, ""); 
-            }
-            category.ParentCategoryId = category.Id;
-
-
-
-            // each michlol
-            foreach (var michlol in _model.MichlolList)
-            {
-                category = service.IsCategoryExists(michlol.Name, category.ParentCategoryId);
-                if (!category.IsCategoryExists)
-                {
-                    category.Id = service.CategoryInsert(_model.Year, category.ParentCategoryId, michlol.ImageUrl);
-                }
-                category.ParentCategoryId = category.Id;
-
-                // each part in michlol
-                foreach (var part in michlol.PartList)
-                {
-                    var productId = service.ProductInsert(part.Name, part.Sku, part.Price, part.IdInDiagram);
-                    service.ProductCategoryMapping(productId, category.Id);
-                }
-            }
-
-
-
-           
         }
 
 
@@ -158,104 +137,99 @@ namespace OemCrawler
             var str = _htmlCode.Substring(0, lengthOfString); // "2017 Suzuki GSXR600  "
             str = str.Trim(); // "2017 Suzuki GSXR600"
 
-            _model.Year = LbModelYear.Text = str.Substring(0, 4); // get the year. 4:year length
-             
+            if (str.ToLower().Contains("all"))
+            {
+                str = str.Replace("All", "").Trim();
+            }
+            _model.Year = str.Substring(0, 4); // get the year. 4:year length
+            Console.WriteLine(@"List Year: " + _model.Year);
 
             str = str.Replace(_model.Year, ""); // " Suzuki GSXR600"
             str = str.Trim();  // "Suzuki GSXR600"
 
             var arrStr = str.Split(' ');
-            _model.Brand = arrStr[0]; //Suzuki
-            _model.Name = LbModelName.Text = arrStr[1]; //GSXR600
+            _model.Brand = arrStr[0].Trim(); //Suzuki
+            Console.WriteLine(@"List Brand: " + _model.Brand);
+
+            _model.Name = str.Replace(_model.Brand,"").Trim(); //GSXR600
+            Console.WriteLine(@"List Model: " + _model.Name);
 
         }
+
         private void GetMichlolNameAndUrl()
         {
-
-            var stringToFind = "https://www.motosport.com/motorcycle/oem-parts";
-            var nextPosLoc = _htmlCode.IndexOf(stringToFind, StringComparison.Ordinal);
-
-
-            var counter = 1; // just for testing - to make sure it loops only once 
-            while (nextPosLoc > 0 && counter <= 1)
-
+            _htmlAgilityDoc.LoadHtml(_htmlCode);
+            var oemCols = _htmlAgilityDoc.DocumentNode.SelectNodes("//div[contains(@class,'oem-inner-col')]");
+          
+            foreach (var col in oemCols)
             {
-                counter++;
+                var colLinks = col.SelectNodes("a");
 
-                var michlol = new Michlol();
-                _htmlCode = _htmlCode.Remove(0, nextPosLoc); // remove to the start
-
-                var nextPosLocEnd = _htmlCode.IndexOf("\">", StringComparison.Ordinal);  // the end of the url  ">
-                michlol.PageUrl = _htmlCode.Substring(0, nextPosLocEnd); // get the url                
-
-                _htmlCode = _htmlCode.Remove(0, nextPosLocEnd + ("\">".Length)); // remove all upto the end of url (before the name)
-
-                nextPosLocEnd = _htmlCode.IndexOf("</a>", 0, StringComparison.Ordinal);
-                michlol.Name = LbMichlolName.Text = _htmlCode.Substring(0, nextPosLocEnd); // get the name
-
-                var countSlash = michlol.PageUrl.Count(f => f == '/');
-                if (countSlash >= 8)
+                foreach (var a in colLinks)
                 {
-                    _model.MichlolList.Add(michlol);
-                }
+                    var michlol = new Michlol
+                    {
+                        PageUrl = a.Attributes["href"].Value,
+                        Name = a.InnerText
+                    };
 
-                nextPosLoc = _htmlCode.IndexOf(stringToFind, StringComparison.Ordinal); // find the next part of the URL (first time before the While() )
+                    Console.WriteLine(@"List michlol: " + michlol.Name);
+
+                    // if _lastStoppedMichlolName has value, we need to add to list only from this string
+                    bool flagFromNowAddToMichlolList = !(_lastStoppedMichlolName.Length > 0); 
+                    // we will add the michlol only when we reach this string (to continiue from that position)
+                    if (michlol.Name.Trim().ToLower() == _lastStoppedMichlolName)
+                    {
+                        flagFromNowAddToMichlolList = true;
+                    }
+                    if (flagFromNowAddToMichlolList)
+                    {
+                        // we dont need to find the last name
+                        _model.MichlolList.Add(michlol);
+                    }
+                }
             }
+
+            
         }
 
         private void AddMichlolParts(Michlol michlol, string htmlCode)
         {
             _htmlAgilityDoc.LoadHtml(htmlCode);
-            htmlCode = _htmlAgilityDoc.DocumentNode.SelectSingleNode("//ul[@id='SKUDataTable']").InnerHtml;
+            var nodes = _htmlAgilityDoc.DocumentNode.SelectNodes("//li[contains(@id,'skuID')]");
 
-
-            var nextPosLoc = htmlCode.IndexOf(" sku=\"", StringComparison.Ordinal); // keep the " " before sku !
-
-            var partCounter = 0;
-            while (nextPosLoc > 0)
+            foreach (HtmlNode node in nodes)
             {
-                _totalPartCounter++;
-                LbTotalPartCounter.Text = _totalPartCounter.ToString();
-
-                partCounter++;
-                LbPartCounter.Text = partCounter.ToString();
-
-
                 var part = new Part();
 
-                //sku
-                htmlCode = htmlCode.Remove(0, (nextPosLoc + " sku=\"".Length)); // move to sku, remove before
-                var nextPosLocEnd = htmlCode.IndexOf("\"", StringComparison.Ordinal);  // the end of the sku ended with  quote:  "
-                part.Sku = htmlCode.Substring(0, nextPosLocEnd);
+
+                //part.Sku = p.Attributes["sku"].Value.Trim();
+
+                var htmlTag = node.SelectSingleNode(".//span[@class='oem-sku']");
+                part.Sku = htmlTag.InnerText.Trim();
+
+                // load again the current node
 
 
-                //Id in diagram:
-                nextPosLoc = htmlCode.IndexOf("class=\"oem-count\">", StringComparison.Ordinal); // just to move cursor
-                htmlCode = htmlCode.Remove(0, nextPosLoc + "class=\"oem-count\">".Length); // remove up to this point
-                nextPosLocEnd = htmlCode.IndexOf("</span>", StringComparison.Ordinal); //Price: </strong><i class="fa fa-ils"></i>36.63</span>
-                part.IdInDiagram = int.Parse(htmlCode.Substring(0, nextPosLocEnd));
+                htmlTag = node.SelectSingleNode(".//span[@class='oem-count']");
+                part.IdInDiagram = htmlTag.InnerText.Trim();
 
+                htmlTag = node.SelectSingleNode(".//span[@class='oem-description']");
+                part.Name = htmlTag.InnerText.Trim();
 
-                //name
-                nextPosLoc = htmlCode.IndexOf("oem-description", StringComparison.Ordinal); // just to move cursor to remove duplicated strings
-                htmlCode = htmlCode.Remove(0, nextPosLoc + "oem-description".Length); //  remove up to this point
-                nextPosLoc = htmlCode.IndexOf("class=\"trackevent\">", StringComparison.Ordinal); // just to cut before
-                htmlCode = htmlCode.Remove(0, nextPosLoc + ("class=\"trackevent\">".Length)); // remove up to "oem-description"
-                nextPosLocEnd = htmlCode.IndexOf("</a>", StringComparison.Ordinal); //class="trackevent">VALVE ASSY, 2ND AIR REED</a>
-                part.Name = LbPartName.Text = htmlCode.Substring(0, nextPosLocEnd);
+                Console.WriteLine(@"List part: " + part.Name);
 
-                //price
-                nextPosLoc = htmlCode.IndexOf("Price: </strong><i class=\"fa fa-ils\"></i>", StringComparison.Ordinal); // just to move cursor
-                htmlCode = htmlCode.Remove(0, nextPosLoc + ("Price: </strong><i class=\"fa fa-ils\"></i>".Length));
-                nextPosLocEnd = htmlCode.IndexOf("</span>", StringComparison.Ordinal); //Price: </strong><i class="fa fa-ils"></i>36.63</span>
-                part.Price = double.Parse(htmlCode.Substring(0, nextPosLocEnd));
+                htmlTag = node.SelectSingleNode(".//span[contains(@id,'price')]");
 
-                //-----ADD-----            
+                part.Price = 0;
+                if (htmlTag == null) continue;
+
+                var strPrice = htmlTag.InnerText.Trim();
+                if (double.TryParse(strPrice, out var price))
+                {
+                    part.Price = price;
+                }
                 michlol.PartList.Add(part);
-
-
-                nextPosLoc = htmlCode.IndexOf(" sku=\"", StringComparison.Ordinal); // for the next sku loop
-
             }
 
         }
@@ -279,11 +253,7 @@ namespace OemCrawler
                         htmlCode = client.DownloadString(michlol.PageUrl);
                     }
                 }
-
-
-
-
-
+                
                 // add the 
                 AddDiagramImageUrl(michlol, htmlCode);
                 AddMichlolParts(michlol, htmlCode);
@@ -298,78 +268,156 @@ namespace OemCrawler
 
         private void AddDiagramImageUrl(Michlol michlol, string htmlCode)
         {
-
-            _htmlAgilityDoc = new HtmlAgilityPack.HtmlDocument();
-
-            _htmlAgilityDoc.LoadHtml(htmlCode);
-
-            var imageElem = _htmlAgilityDoc.DocumentNode.SelectSingleNode("//*[contains(@class,'PGImage active')]");
-            var imageHref = imageElem.Attributes["data-src"].Value;
-            imageHref = imageHref.Replace("zoom=3", "zoom=5"); // I need zoom=5 (bigger)
-            michlol.ImageUrl = "https://www.motosport.com" + imageHref;
-        }
-
-
-       
-
-
-
-
-
-
-        public class Models
-        {
-            public Models()
+            try
             {
-                MichlolList = new List<Michlol>();
+                _htmlAgilityDoc = new HtmlAgilityPack.HtmlDocument();
+
+                _htmlAgilityDoc.LoadHtml(htmlCode);
+
+                var imageHref = "";
+                var imageElem = (((_htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage7']") ??
+                                   _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage6']")) ??
+                                  _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage5']")) ??
+                                 _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage4']")) ??
+                                _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage3']");
+
+
+                // still cannot find the diagram image
+                if (imageElem == null)
+                {
+                    Thread.Sleep(3000);
+                    using (var client = new WebClient())
+                    {
+                        htmlCode = client.DownloadString(michlol.PageUrl);                       
+                    }
+                    _htmlAgilityDoc.LoadHtml(htmlCode);
+                    imageElem = (((_htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage7']") ??
+                                       _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage6']")) ??
+                                      _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage5']")) ??
+                                     _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage4']")) ??
+                                    _htmlAgilityDoc.DocumentNode.SelectSingleNode(".//img[@id='PartGroupImage3']");
+                }
+
+                imageHref = imageElem.Attributes["data-src"].Value;
+
+                // incase one of the zoom=1-4
+                imageHref = imageHref.Replace("zoom=1", "zoom=5"); // I need zoom=5 (bigger)
+                imageHref = imageHref.Replace("zoom=2", "zoom=5");  
+                imageHref = imageHref.Replace("zoom=3", "zoom=5");  
+                imageHref = imageHref.Replace("zoom=4", "zoom=5");  
+             
+
+
+                michlol.ImageUrl = "https://www.motosport.com" + imageHref;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                throw;
             }
 
-            public string Name { get; set; }
-            public string Brand { get; set; }
-            public string Year { get; set; }
-
-            public List<Michlol> MichlolList { get; set; }
-
 
         }
 
-        public class Michlol
+
+        private void InsertToDb()
         {
-            public Michlol()
+
+            var service = new Services(txtToken.Text);
+
+            int prevCatId = _brandCategoryId;
+
+            // model name:             
+            var category = service.IsCategoryExists(_model.Name, prevCatId); // this func return checks if this cat exists and return it's parentId
+            if (!category.IsCategoryExists)
             {
-                PartList = new List<Part>();
+                // insert & get CatId
+                category = service.CategoryInsert(_model.Name, prevCatId, ""); // the model takes the catId from combobox
             }
 
-            public string Name { get; set; }
-            public string PageUrl { get; set; }
+            //gsx=122
+            prevCatId = category.Id;
 
-            public string ImageUrl { get; set; }
 
-            public List<Part> PartList { get; set; }
 
+
+
+            // model year           
+            category = service.IsCategoryExists(_model.Year, prevCatId); // this func return checks if this cat exists and return it's parentId
+            if (!category.IsCategoryExists)
+            {
+                category = service.CategoryInsert(_model.Year, prevCatId, "");
+            }
+
+            // year = 123
+            var yearParentId = category.Id;
+
+
+
+            // each michlol
+            foreach (var michlol in _model.MichlolList)
+            {
+                category = service.IsCategoryExists(michlol.Name, yearParentId);
+                if (!category.IsCategoryExists)
+                {
+                    category = service.CategoryInsert(michlol.Name, yearParentId, michlol.ImageUrl);
+                }
+                prevCatId = category.Id;
+
+                // each part in michlol
+                foreach (var part in michlol.PartList)
+                {
+                    var product = service.IsProductExists(part.Sku);
+
+                    if (!product.IsProductExists)
+                    {
+                        product.Id = service.ProductInsert(part.Name, part.Sku, part.Price, part.IdInDiagram);
+                        // it's a new product: map to category
+                        service.ProductCategoryMappingInsert(product.Id, prevCatId);
+                    }
+                    else
+                    {
+                        // it's not a new product. check if it mapped to category
+                        var isMappingExists = service.IsProductCategoryMappingExists(product.Id, prevCatId);
+                        if (!isMappingExists)
+                        {
+                            service.ProductCategoryMappingInsert(product.Id, prevCatId);
+                        }
+                    }
+
+                }
+            }
         }
 
-        public class Part
+
+
+
+
+
+
+        public bool IsApiOnline()
         {
-            public string Name { get; set; }
-            public string Sku { get; set; }
+            bool isOnline;
+            using (var client = new WebClient { Encoding = Encoding.UTF8 })
+            {
+                try
+                {
+                    var str = client.DownloadString(
+                        "http://localhost:15536/images/ScrappedDiagrams/test-file-dont-delete.txt");
 
-            public double Price { get; set; }
+                    isOnline = str.Contains("eyalankri");
+                }
+                catch (Exception)
+                {
+                    isOnline = false;
+                }
+            }
+            return isOnline;
 
-            public int IdInDiagram { get; set; }
+
+
 
         }
-
-
-        public class Category
-        {
-            public int Id { get; set; }
-            public int ParentCategoryId { get; set; }
-
-            public bool IsCategoryExists { get; set; }
-        }
-
-      
 
         
     }

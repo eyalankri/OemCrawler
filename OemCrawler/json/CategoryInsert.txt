@@ -3,7 +3,7 @@
     "name": "{category-name}",
     "localized_names": [
       {
-        "language_id": 1,
+        "language_id": 0,
         "localized_name": "{category-name}"
       }
     ],
@@ -16,6 +16,7 @@
     "include_in_top_menu": false,
     "published": true,
     "deleted": false,
-    "image": { "src": "{category-image-url}" }
+    "se_name": "{category-name}",
+    "image": { "src": "http://localhost:15536/images/ScrappedDiagrams/image_wm.jpeg" }
   }
 }

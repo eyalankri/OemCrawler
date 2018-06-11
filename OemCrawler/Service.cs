@@ -13,20 +13,19 @@ namespace OemCrawler
     public class Services
     {
         private readonly string _token;
-        private readonly string _imageUrl = @"D:\Projects\OemCrawler\OemCrawler\Image\image.jpeg";
-        private readonly string _imageWmUrl = @"D:\Projects\OemCrawler\OemCrawler\Image\image_wm.jpeg";
+        private readonly string _diagramImageSaveAt = @"D:/Projects/Nop-Oem-Parts/Presentation/Nop.Web/wwwroot/images/ScrappedDiagrams/image.jpeg";
+        private readonly string _diagramImageWmSaveAt = @"D:/Projects/Nop-Oem-Parts/Presentation/Nop.Web/wwwroot/images/ScrappedDiagrams/image_wm.jpeg";
+        private readonly string _categoryInsertApiUrl = "http://localhost:15536/api/categories/";
+        private readonly string _productInsertApiUrl = "http://localhost:15536/api/products/";
+        private readonly string _productCategoryMappingInsertApiUrl = "http://localhost:15536/api/product_category_mappings/";
+
+        //http://localhost:15536/images/ScrappedDiagrams/image_wm.jpeg
 
 
         public Services(string token)
         {
             _token = token;
         }
-
-        private string _categoryInsertApiUrl = "http://localhost:15536/api/categories/";
-        private string _productInsertApiUrl = "http://localhost:15536/api/products/";
-        private string _productCategoryMappingInsertApiUrl = "http://localhost:15536/api/product_category_mappings/";
-
-
 
         public string PostToApi(string apiUrl, string jsonString, string bearerToken)
         {
@@ -40,15 +39,9 @@ namespace OemCrawler
         }
 
 
-
-
-
-
-        public Form1.Category IsCategoryExists(string categoryName, int parentCategoryId)
+        public Category IsCategoryExists(string categoryName, int parentCategoryId)
         {
-
-
-            var category = new Form1.Category
+            var category = new Category
             {
                 ParentCategoryId = -1,
                 Id = -1,
@@ -80,53 +73,126 @@ namespace OemCrawler
             return category;
         }
 
-        public int CategoryInsert(string name, int parentId, string imageUrl)
+
+        public Product IsProductExists(string sku)
         {
+            var product = new Product
+            {
+                Id = -1,
+                IsProductExists = false,
+            };
+
+            using (var conn = new SqlConnection(DbConn.Conn))
+            {
+                using (var cmd = new SqlCommand("[OemCrawler_Select_Product_Sku]", conn))
+                {
+                    conn.Open();
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Sku", sku);
+
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        reader.Read();
+                        if (reader.HasRows)
+                        {
+                            product.IsProductExists = true;
+                            product.Id = (int)reader["Id"];
+                        }
+                        reader.Close();
+                    }
+                }
+            }
+            return product;
+        }
+
+
+        public bool IsProductCategoryMappingExists(int productId, int categoryId)
+        {
+
+            var isMappingExists = false;
+
+            using (var conn = new SqlConnection(DbConn.Conn))
+            {
+                using (var cmd = new SqlCommand("[OemCrawler_Select_Product_Category_Mapping]", conn))
+                {
+                    conn.Open();
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@ProductId", productId);
+                    cmd.Parameters.AddWithValue("@CategoryId", categoryId);
+
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        reader.Read();
+                        if (reader.HasRows)
+                        {
+                            isMappingExists = true;
+                        }
+                        reader.Close();
+                    }
+                }
+            }
+            return isMappingExists;
+        }
+
+
+
+        public Category CategoryInsert(string name, int parentId, string michlolImageUrl)
+        {
+
+            Console.WriteLine(@"Insert category: " + name);
+
+            var category = new Category();
+
             // download the images into local storage
-            if (imageUrl != "")
+            if (michlolImageUrl != "")
             {
                 using (var client = new WebClient { Encoding = Encoding.UTF8 })
                 {
                     try
                     {
-                        client.DownloadFile(imageUrl, _imageUrl);
+                        client.DownloadFile(michlolImageUrl, michlolImageUrl);
                     }
                     catch (WebException)
                     {
                         System.Threading.Thread.Sleep(3000);
-                        client.DownloadFile(imageUrl, _imageUrl);
+                        client.DownloadFile(michlolImageUrl, _diagramImageSaveAt);
                     }
                 }
                 //replace watermark
                 AddWaterMark();
             }
-            
 
 
-            var jsonFileName = (imageUrl == "") ? "CategoryCreateNoImage.json" : "CategoryCreate.json";
+
+            var jsonFileName = (michlolImageUrl == "") ? "CategoryInsertNoImage.txt" : "CategoryInsert.txt";
             var json = File.ReadAllText(@"D:\Projects\OemCrawler\OemCrawler\json\" + jsonFileName);
 
+            name = name.Replace("\"", "'");
             json = json.Replace("{category-name}", name);
             json = json.Replace("{parent-category-id}", parentId.ToString()); // parent
-            json = json.Replace("{category-image}", _imageWmUrl);
+            // json = json.Replace("{category-image-url}", _diagramImageWmSaveAt); already in the json file
 
             var stringJson = PostToApi(_categoryInsertApiUrl, json, _token);
             var jObjext = JObject.Parse(stringJson);
 
-            var newCategoryId = (string)jObjext["categories"][0]["id"];
+            category.Id = (int)jObjext["categories"][0]["id"];
+            category.ParentCategoryId = (int)jObjext["categories"][0]["parent_category_id"];
 
-            return int.Parse(newCategoryId);
+            return category;
         }
 
 
 
-        public int ProductInsert(string name, string sku, double price, int idInDiagram)
+        public int ProductInsert(string name, string sku, double price, string idInDiagram)
         {
-
-            var jsonFileName = "CategoryCreate.json";
+            Console.WriteLine(@"Insert product: " + name);
+            var jsonFileName = "ProductInsert.txt";
             var json = File.ReadAllText(@"D:\Projects\OemCrawler\OemCrawler\json\" + jsonFileName);
 
-            json = json.Replace("{part-name}", idInDiagram + "." + name);
+            name = name.Replace("\"", "'");
+            json = json.Replace("{part-name}", idInDiagram + ". " + name);
             json = json.Replace("{sku}", sku);
             json = json.Replace("{price}", price.ToString(CultureInfo.InvariantCulture));
 
@@ -138,9 +204,11 @@ namespace OemCrawler
             return int.Parse(produtId);
         }
 
-        public void ProductCategoryMapping(int productId, int categoryId)
+        public void ProductCategoryMappingInsert(int productId, int categoryId)
         {
-            var jsonFileName = "ProductCategoryMapping.json";
+            Console.WriteLine(@"Insert mapping: " + categoryId + @"," + productId);
+
+            var jsonFileName = "ProductCategoryMappingInsert.txt";
             var json = File.ReadAllText(@"D:\Projects\OemCrawler\OemCrawler\json\" + jsonFileName);
 
             json = json.Replace("{product-id}", productId.ToString());
@@ -161,7 +229,18 @@ namespace OemCrawler
             var brushForText = new SolidBrush(color);
             var brushForBg = new SolidBrush(Color.FromArgb(245, 255, 255, 255)); // first one is opacity
 
-            var partImg = (Bitmap)Image.FromFile(_imageUrl);
+            Bitmap partImg;
+            try
+            {
+                partImg = (Bitmap)Image.FromFile(_diagramImageSaveAt);
+            }
+            catch (Exception e)
+            {
+                partImg = (Bitmap)Image.FromFile(_diagramImageSaveAt);
+                Console.WriteLine(e);
+
+            }
+
 
 
             var bgWidth = 250;
@@ -192,6 +271,7 @@ namespace OemCrawler
                 var bg2 = new Rectangle(x, (partImg.Height - bgHeight), bgWidth, bgHeight); //bottom of page
 
 
+
                 graphics.FillRectangle(brushForBg, bg1);
                 graphics.FillRectangle(brushForBg, bg2);
 
@@ -204,8 +284,11 @@ namespace OemCrawler
 
             graphics.Dispose();
 
-            partImg.Save(_imageWmUrl);
+            partImg.Save(_diagramImageWmSaveAt);
         }
+
+
+
 
     }
 }

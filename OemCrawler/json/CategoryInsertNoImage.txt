@@ -15,6 +15,7 @@
     "show_on_home_page": false,
     "include_in_top_menu": false,
     "published": true,
-    "deleted": false   
+    "deleted": false,
+	"se_name": "{category-name}"
   }
 }
