@@ -11,20 +11,23 @@ using Newtonsoft.Json.Linq;
 namespace OemCrawler
 {
     public class Services
-    {
+    {  
         private readonly string _token;
-        private readonly string _diagramImageSaveAt = @"D:/Projects/Nop-Oem-Parts/Presentation/Nop.Web/wwwroot/images/ScrappedDiagrams/image.jpeg";
-        private readonly string _diagramImageWmSaveAt = @"D:/Projects/Nop-Oem-Parts/Presentation/Nop.Web/wwwroot/images/ScrappedDiagrams/image_wm.jpeg";
+        private readonly string _jsonsFolder = @"D:\Projects\Nop-Oem-Parts\OemCrawler\OemCrawler\json\";
+        private readonly string _SiteImagesFolder = @"D:/Projects/Nop-Oem-Parts/Site/Presentation/Nop.Web/wwwroot/images/ScrappedDiagrams/";
+        readonly string _diagramImageSaveAt;
+        readonly string _diagramImageWmSaveAt;       
         private readonly string _categoryInsertApiUrl = "http://localhost:15536/api/categories/";
         private readonly string _productInsertApiUrl = "http://localhost:15536/api/products/";
         private readonly string _productCategoryMappingInsertApiUrl = "http://localhost:15536/api/product_category_mappings/";
-
-        //http://localhost:15536/images/ScrappedDiagrams/image_wm.jpeg
+     
 
 
         public Services(string token)
         {
             _token = token;
+            _diagramImageSaveAt = _SiteImagesFolder + "image.jpeg";
+            _diagramImageWmSaveAt = _SiteImagesFolder + "image_wm.jpeg";
         }
 
         public string PostToApi(string apiUrl, string jsonString, string bearerToken)
@@ -136,12 +139,9 @@ namespace OemCrawler
             return isMappingExists;
         }
 
-
-
         public Category CategoryInsert(string name, int parentId, string michlolImageUrl)
         {
 
-            Console.WriteLine(@"Insert category: " + name);
 
             var category = new Category();
 
@@ -164,10 +164,8 @@ namespace OemCrawler
                 AddWaterMark();
             }
 
-
-
             var jsonFileName = (michlolImageUrl == "") ? "CategoryInsertNoImage.txt" : "CategoryInsert.txt";
-            var json = File.ReadAllText(@"D:\Projects\OemCrawler\OemCrawler\json\" + jsonFileName);
+            var json = File.ReadAllText(_jsonsFolder + jsonFileName);
 
             name = name.Replace("\"", "'");
             json = json.Replace("{category-name}", name);
@@ -189,11 +187,12 @@ namespace OemCrawler
         {
             Console.WriteLine(@"Insert product: " + name);
             var jsonFileName = "ProductInsert.txt";
-            var json = File.ReadAllText(@"D:\Projects\OemCrawler\OemCrawler\json\" + jsonFileName);
+            var json = File.ReadAllText(_jsonsFolder + jsonFileName);
 
             name = name.Replace("\"", "'");
-            json = json.Replace("{part-name}", idInDiagram + ". " + name);
+            json = json.Replace("{part-name}", name.Replace("\\",""));
             json = json.Replace("{sku}", sku);
+            json = json.Replace("{id-in-diagram}", idInDiagram);
             json = json.Replace("{price}", price.ToString(CultureInfo.InvariantCulture));
 
             var stringJson = PostToApi(_productInsertApiUrl, json, _token);
@@ -209,7 +208,7 @@ namespace OemCrawler
             Console.WriteLine(@"Insert mapping: " + categoryId + @"," + productId);
 
             var jsonFileName = "ProductCategoryMappingInsert.txt";
-            var json = File.ReadAllText(@"D:\Projects\OemCrawler\OemCrawler\json\" + jsonFileName);
+            var json = File.ReadAllText(_jsonsFolder + jsonFileName);
 
             json = json.Replace("{product-id}", productId.ToString());
             json = json.Replace("{category-id}", categoryId.ToString());
@@ -285,7 +284,13 @@ namespace OemCrawler
             graphics.Dispose();
 
             partImg.Save(_diagramImageWmSaveAt);
+
+            Console.WriteLine(@"Image saved in folder");
         }
+
+
+
+ 
 
 
 

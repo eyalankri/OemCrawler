@@ -2,6 +2,7 @@
   "product": {
     "name": "{part-name}",   
     "sku": "{sku}",   
+	"Id_In_Diagram": "{id-in-diagram}", 
     "price": {price}
   }
 }

@@ -41,6 +41,7 @@ namespace OemCrawler
 
     public class Part
     {
+        public int Id { get; set; }
         public string Name { get; set; }
         public string Sku { get; set; }
 

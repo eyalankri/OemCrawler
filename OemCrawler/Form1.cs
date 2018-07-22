@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Linq;
+using System.Data;
+using System.Data.SqlClient;
 using System.Net;
-using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using HtmlAgilityPack;
@@ -22,6 +21,7 @@ namespace OemCrawler
         public int CategoryId;
         private int _brandCategoryId;
         private string _lastStoppedMichlolName;
+        private string[] _arrUrls;
 
 
         public Form1()
@@ -30,10 +30,7 @@ namespace OemCrawler
             _model = new Models();
             _htmlAgilityDoc = new HtmlAgilityPack.HtmlDocument();
         }
-
-
-
-
+        
 
         private void Form1_Load(object sender, EventArgs e)
         {
@@ -41,8 +38,8 @@ namespace OemCrawler
             var comboSource = new Dictionary<int, string>
             {
                 { 0, "-- בחר קטגוריה --" },
-                { 2, "אופנועים -> סוזוקי" },
-                { 1242, "אופנועים -> הוסקוורנה" },
+                { 1, "אופנועים -> סוזוקי" },
+                //{ 1242, "אופנועים -> הוסקוורנה" },
                 //{ 1024, "אופנועים -> הוסקוורנה" }
             };
 
@@ -83,42 +80,58 @@ namespace OemCrawler
 
             btnGo.Text = @"working...";
 
-            using (var client = new WebClient { Encoding = Encoding.UTF8 })
-            {
-                try
-                {
-                    _htmlCode = client.DownloadString(txtUrl.Text.Trim());
-                }
-                catch (WebException)
-                {
-                    Thread.Sleep(3000);
-                    _htmlCode = client.DownloadString(txtUrl.Text.Trim());
-                }
 
-            }
-
-            ThreadPool.QueueUserWorkItem(StartScrap);
-
-
+            _arrUrls = txtUrl.Text.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
             
-
+            ThreadPool.QueueUserWorkItem(StartScrap);
+            
         }
 
-
-
-
+        
         private void StartScrap(object state)
         {
-            Console.Clear();
+             
+            foreach (var url in _arrUrls)
+            {
+                Console.Clear();
+                _model.MichlolList.Clear();
 
-            ScrapModelPage(); // scrap model page
-            GetMichlolNameAndUrl(); // from model page
-            ScrapMichlolPages(); // get the parts
-            InsertToDb();
-            Console.WriteLine(@"-----------> DoWork finished! <------------");
+                if (url=="")
+                {
+                    continue;;
+                }
+                
+                using (var client = new WebClient {Encoding = Encoding.UTF8})
+                {
+                    try
+                    {
+                        _htmlCode = client.DownloadString(url.Trim());
+                    }
+                    catch (WebException)
+                    {
+                        Thread.Sleep(5000);
+                        _htmlCode = client.DownloadString(url.Trim());
+                    }
+
+                    ScrapModelPage(); // scrap model page
+                    GetMichlolNameAndUrl(); // from model page
+                    ScrapMichlolPages(); // get the parts
+                    InsertToDb();
+                    Console.WriteLine(@"---------> Finish: " + url);
+
+                }
+            }
+
+            foreach (var url in _arrUrls)
+            {
+                Console.WriteLine(@"---------> All Finished: " + url);
+            }
+        
 
 
-        }
+
+
+    }
 
 
         private void ScrapModelPage()
@@ -157,7 +170,7 @@ namespace OemCrawler
         }
 
         private void GetMichlolNameAndUrl()
-        {
+        {            
             _htmlAgilityDoc.LoadHtml(_htmlCode);
             var oemCols = _htmlAgilityDoc.DocumentNode.SelectNodes("//div[contains(@class,'oem-inner-col')]");
           
@@ -198,6 +211,10 @@ namespace OemCrawler
             _htmlAgilityDoc.LoadHtml(htmlCode);
             var nodes = _htmlAgilityDoc.DocumentNode.SelectNodes("//li[contains(@id,'skuID')]");
 
+            if (nodes == null)
+            {
+                return;
+            }
             foreach (HtmlNode node in nodes)
             {
                 var part = new Part();
@@ -216,6 +233,7 @@ namespace OemCrawler
 
                 htmlTag = node.SelectSingleNode(".//span[@class='oem-description']");
                 part.Name = htmlTag.InnerText.Trim();
+                part.Name = Regex.Replace(part.Name, @"\s+", " ");
 
                 Console.WriteLine(@"List part: " + part.Name);
 
@@ -234,6 +252,7 @@ namespace OemCrawler
 
         }
 
+
         private void ScrapMichlolPages()
         {
 
@@ -249,7 +268,7 @@ namespace OemCrawler
                     }
                     catch (WebException)
                     {
-                        System.Threading.Thread.Sleep(3000);
+                        Thread.Sleep(3000);
                         htmlCode = client.DownloadString(michlol.PageUrl);
                     }
                 }
@@ -259,8 +278,6 @@ namespace OemCrawler
                 AddMichlolParts(michlol, htmlCode);
 
             }
-
-
 
 
 
@@ -285,7 +302,7 @@ namespace OemCrawler
                 // still cannot find the diagram image
                 if (imageElem == null)
                 {
-                    Thread.Sleep(3000);
+                    Thread.Sleep(10000);
                     using (var client = new WebClient())
                     {
                         htmlCode = client.DownloadString(michlol.PageUrl);                       
@@ -309,6 +326,7 @@ namespace OemCrawler
 
 
                 michlol.ImageUrl = "https://www.motosport.com" + imageHref;
+                Console.Write(@"Add michlol image: " + michlol.ImageUrl);
             }
             catch (Exception ex)
             {
@@ -353,15 +371,24 @@ namespace OemCrawler
             var yearParentId = category.Id;
 
 
-
+            var michlolLoopCount = 0;
+            var michlolTotalCount = _model.MichlolList.Count;
             // each michlol
             foreach (var michlol in _model.MichlolList)
             {
+                michlolLoopCount++;
+
                 category = service.IsCategoryExists(michlol.Name, yearParentId);
                 if (!category.IsCategoryExists)
-                {
+                {                    
                     category = service.CategoryInsert(michlol.Name, yearParentId, michlol.ImageUrl);
+                    Console.WriteLine(@"Insert category: " + michlol.Name + $@" ,({michlolLoopCount}/{michlolTotalCount})"  );
                 }
+                else
+                {
+                    Console.WriteLine(@"Category exists: " + michlol.Name + $@" ,({michlolLoopCount}/{michlolTotalCount})");
+                }
+
                 prevCatId = category.Id;
 
                 // each part in michlol
@@ -377,7 +404,7 @@ namespace OemCrawler
                     }
                     else
                     {
-                        // it's not a new product. check if it mapped to category
+                        // it's not a new product. check if it mapped this category
                         var isMappingExists = service.IsProductCategoryMappingExists(product.Id, prevCatId);
                         if (!isMappingExists)
                         {
@@ -419,7 +446,99 @@ namespace OemCrawler
 
         }
 
-        
+        private void btnRemoveSpaces_Click(object sender, EventArgs e)
+        {
+            // remove multiple white-spaces
+
+            var list = new List<Part>();
+            using (var conn = new SqlConnection(DbConn.Conn))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("[OemCrawler_Product_Select]", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new Part()
+                            {
+                                Id = (int)reader["Id"],
+                                Name = Regex.Replace((string)reader["Name"], @"\s+", " "),
+                            });
+
+                        }
+                    }
+                }
+                foreach (var p in list)
+                {
+                    var cmd = new SqlCommand("[OemCrawler_Product_Update-Name]", conn) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("@Id", p.Id);
+                    cmd.Parameters.AddWithValue("@Name", p.Name);
+                    cmd.ExecuteNonQuery();
+                    Console.WriteLine(p.Name);
+                }
+                conn.Close();
+            }
+
+            Console.WriteLine(@"--------> Done!");
+        }
+
+        private void btnFixDiagramId_Click(object sender, EventArgs e)
+        {
+            var list = new List<Part>();
+            using (var conn = new SqlConnection(DbConn.Conn))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("[OemCrawler_Product_Select]", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var item = new Part();
+
+                            item.Id = (int)reader["Id"];
+                           item.Name = Regex.Replace((string)reader["Name"], @"\s+", " ");
+
+                            var name = item.Name;
+
+                            var index = name.IndexOf('.');
+                            var length = name.Length;
+
+                            if (index < 0) { continue; }
+
+                            name = name.Substring(index + 1, length - (index + 1)).Trim();
+                            var diagramId = item.Name.Substring(0, index).Replace(".", string.Empty);
+
+                            item.IdInDiagram = diagramId;
+
+                            if (name.IndexOf('.',0) == 0 )
+                            {
+                                name = name.Substring(1, name.Length - 1);
+                            }
+                            item.Name = name;                            
+                            list.Add(item);
+                        }
+                    }
+                }
+                foreach (var p in list)
+                {
+                    var cmd = new SqlCommand("[OemCrawler_Product_Fix-Name]", conn) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("@Id", p.Id);
+                    cmd.Parameters.AddWithValue("@Name", p.Name);
+                    cmd.Parameters.AddWithValue("@IdInDiagram", p.IdInDiagram);
+                    cmd.ExecuteNonQuery();
+                    Console.WriteLine(p.Name);
+                }
+                conn.Close();
+            }
+
+            Console.WriteLine(@"--------> Done!");
+        }
     }
 
 
