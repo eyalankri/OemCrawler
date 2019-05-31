@@ -17,6 +17,6 @@
     "published": true,
     "deleted": false,
     "se_name": "{category-name}",
-    "image": { "src": "http://localhost:15536/images/ScrappedDiagrams/image_wm.jpeg" }
+   "image": { "src": "{image-src}" }
   }
 }

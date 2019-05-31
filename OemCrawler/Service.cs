@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
@@ -11,16 +12,18 @@ using Newtonsoft.Json.Linq;
 namespace OemCrawler
 {
     public class Services
-    {  
+    {
         private readonly string _token;
-        private readonly string _jsonsFolder = @"D:\Projects\Nop-Oem-Parts\OemCrawler\OemCrawler\json\";
-        private readonly string _SiteImagesFolder = @"D:/Projects/Nop-Oem-Parts/Site/Presentation/Nop.Web/wwwroot/images/ScrappedDiagrams/";
+        private readonly string _jsonsFolder = @"D:\www\Oem\wwwroot\images\ScrappedDiagrams\Json\";
+        private readonly string _SiteImagesFolder = @"D:\www\Oem\wwwroot\images\ScrappedDiagrams\";
         readonly string _diagramImageSaveAt;
-        readonly string _diagramImageWmSaveAt;       
-        private readonly string _categoryInsertApiUrl = "http://localhost:15536/api/categories/";
-        private readonly string _productInsertApiUrl = "http://localhost:15536/api/products/";
-        private readonly string _productCategoryMappingInsertApiUrl = "http://localhost:15536/api/product_category_mappings/";
-     
+        readonly string _diagramImageWmSaveAt;
+        private readonly string _categoryInsertApiUrl = "http://localhost/api/categories/";
+        private readonly string _productInsertApiUrl = "http://localhost/api/products/";
+        private readonly string _productCategoryMappingInsertApiUrl = "http://localhost/api/product_category_mappings/";
+        private readonly string _imageSrcWm;
+        private readonly string _imageSrcColorReplaced;
+        private readonly string finalImageName = "image_final.jpeg";
 
 
         public Services(string token)
@@ -28,6 +31,8 @@ namespace OemCrawler
             _token = token;
             _diagramImageSaveAt = _SiteImagesFolder + "image.jpeg";
             _diagramImageWmSaveAt = _SiteImagesFolder + "image_wm.jpeg";
+            _imageSrcColorReplaced = _SiteImagesFolder + "image_color.jpeg";
+            _imageSrcWm = _SiteImagesFolder + finalImageName;
         }
 
         public string PostToApi(string apiUrl, string jsonString, string bearerToken)
@@ -131,6 +136,7 @@ namespace OemCrawler
                         if (reader.HasRows)
                         {
                             isMappingExists = true;
+
                         }
                         reader.Close();
                     }
@@ -142,9 +148,16 @@ namespace OemCrawler
         public Category CategoryInsert(string name, int parentId, string michlolImageUrl)
         {
 
+            if (File.Exists(_diagramImageSaveAt))
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(_diagramImageSaveAt);
+            }
 
             var category = new Category();
 
+            var addWatermark = true;
             // download the images into local storage
             if (michlolImageUrl != "")
             {
@@ -152,16 +165,25 @@ namespace OemCrawler
                 {
                     try
                     {
-                        client.DownloadFile(michlolImageUrl, michlolImageUrl);
+                        client.DownloadFile(michlolImageUrl, _diagramImageSaveAt);
                     }
                     catch (WebException)
                     {
+                        addWatermark = false;
+                        // download: No Image avilable
+                        michlolImageUrl = "http://localhost/images/ScrappedDiagrams/no-image-avilable.png";
                         System.Threading.Thread.Sleep(3000);
                         client.DownloadFile(michlolImageUrl, _diagramImageSaveAt);
                     }
                 }
                 //replace watermark
-                AddWaterMark();
+                SaveDiagramInFolder();
+
+                if (addWatermark)
+                {
+                    AddWaterMark();
+                }
+              
             }
 
             var jsonFileName = (michlolImageUrl == "") ? "CategoryInsertNoImage.txt" : "CategoryInsert.txt";
@@ -170,9 +192,15 @@ namespace OemCrawler
             name = name.Replace("\"", "'");
             json = json.Replace("{category-name}", name);
             json = json.Replace("{parent-category-id}", parentId.ToString()); // parent
-            // json = json.Replace("{category-image-url}", _diagramImageWmSaveAt); already in the json file
+            if (michlolImageUrl != null)
+            {
+                json = json.Replace("{image-src}", "http://localhost/images/ScrappedDiagrams/" + finalImageName);
+            }
+
 
             var stringJson = PostToApi(_categoryInsertApiUrl, json, _token);
+
+            Console.WriteLine(@"insert category: " + name);
             var jObjext = JObject.Parse(stringJson);
 
             category.Id = (int)jObjext["categories"][0]["id"];
@@ -189,13 +217,20 @@ namespace OemCrawler
             var jsonFileName = "ProductInsert.txt";
             var json = File.ReadAllText(_jsonsFolder + jsonFileName);
 
+            if (name=="")
+            {
+                name = sku;
+            }
+
             name = name.Replace("\"", "'");
-            json = json.Replace("{part-name}", name.Replace("\\",""));
+            json = json.Replace("{part-name}", name.Replace("\\", ""));
             json = json.Replace("{sku}", sku);
             json = json.Replace("{id-in-diagram}", idInDiagram);
             json = json.Replace("{price}", price.ToString(CultureInfo.InvariantCulture));
 
             var stringJson = PostToApi(_productInsertApiUrl, json, _token);
+
+            Console.WriteLine(@"insert product: " + name);
             var jObjext = JObject.Parse(stringJson);
 
             var produtId = (string)jObjext["products"][0]["id"];
@@ -218,79 +253,162 @@ namespace OemCrawler
         }
 
 
-
-
-        private void AddWaterMark()
+        public string TestApi(string apiUrl)
         {
 
-            var font = new Font("Arial", 40, FontStyle.Bold, GraphicsUnit.Pixel);
-            var color = Color.FromArgb(50, 0, 0, 0); //Adds a black watermark with a low alpha value (almost transparent).
-            var brushForText = new SolidBrush(color);
-            var brushForBg = new SolidBrush(Color.FromArgb(245, 255, 255, 255)); // first one is opacity
+            using (var client = new WebClient())
+            {
+                client.Headers.Add(HttpRequestHeader.ContentType, "application/json");
+                client.Headers.Add("Authorization", "Bearer " + _token);
+                try
+                {
+                    return client.DownloadString(new Uri(apiUrl));
+                }
+                catch (Exception e)
+                {
+                    return null;
+                }
 
-            Bitmap partImg;
+            }
+        }
+
+
+        public void SaveDiagramInFolder()
+        {
+            Bitmap img;
             try
             {
-                partImg = (Bitmap)Image.FromFile(_diagramImageSaveAt);
+                img = (Bitmap)Image.FromFile(_diagramImageSaveAt);
             }
             catch (Exception e)
             {
-                partImg = (Bitmap)Image.FromFile(_diagramImageSaveAt);
+                img = (Bitmap)Image.FromFile(_diagramImageSaveAt);
                 Console.WriteLine(e);
+            }
+
+            var colorsToReplace = new List<string>();
+
+            for (int y = 0; y < img.Height; y++)
+            {
+                for (int x = 0; x < img.Width; x++)
+                {
+                    var color1 = img.GetPixel(x, y).Name;
+
+                    if (color1 == "ffffffff")
+                    {
+                        continue;
+                    }
+                    
+                    
+
+
+                    if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#E4E4E4")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#E7E7E7")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffefefe")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffefefe")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffdfdfd")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffcfcfc")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffafafa")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff8f8f8")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff6f6f6")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff5f5f5")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff2f2f2")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff0f0f0")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffefefef")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffeeeeee")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffececec")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffebebeb")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffeaeaea")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe8e8e8")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe7e7e7")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe6e6e6")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe9e9e9")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff3f3f3")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff4f4f4")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff9f9f9")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffbfbfb")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe4e4e4")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe5e5e5")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe3e3e3")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe2e2e2")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe1e1e1")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff1f1f1")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffededed")) { img.SetPixel(x, y, Color.White); }
+                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff7f7f7")) { img.SetPixel(x, y, Color.White); }
+
+
+
+                }
 
             }
 
 
 
-            var bgWidth = 250;
+            img.Save(_imageSrcColorReplaced);
+            img.Dispose();
+
+            Console.WriteLine(@"Image  saved in folder:" + _imageSrcColorReplaced);
+        }
+
+        private void AddWaterMark()
+        {
+           // if you need OPACITY use color like this:
+            var color = Color.FromArgb(50, 0, 0, 0); //Adds a black watermark with a low alpha value (almost transparent).
+
+
+            var font = new Font("Arial", 40, FontStyle.Bold, GraphicsUnit.Pixel);
+            
+            var brushForText = new SolidBrush(color);
+            //var brushForBg = new SolidBrush(Color.FromArgb(245, 255, 255, 255)); // first one is opacity
+            var brushForBg = new SolidBrush(Color.White);
+
+            var bitImg = new Bitmap(Image.FromFile(_imageSrcColorReplaced));
+
+            var bitImgHight = bitImg.Height;
+            var bitImgWidth = bitImg.Width;
+
+            var bgWidthTop = 0;
+            var bgWidthBottom = 600;
             var bgHeight = 50;
 
-            var x = (partImg.Width / 2) - (bgWidth / 2);
-            var y = (partImg.Height / 2) - (bgHeight / 2);
+            var x = (bitImgWidth / 2) - (bgWidthBottom / 2);
+            var y = (bitImg.Height / 2) - (bgHeight / 2);
 
 
             var textPoint1 = new Point(x + 25, y);   // 25 is the text padding from bg    
-            var textPoint2 = new Point(x, partImg.Height - bgHeight);
+            var textPoint2 = new Point(x, bitImgHight - bgHeight);
 
 
-            Graphics graphics;
+            var temp = bitImg;
+            bitImg = new Bitmap(bitImgWidth, bitImgHight);
+            var graphics = Graphics.FromImage(bitImg);
+            graphics.DrawImage(temp, new Rectangle(0, 0, bitImgWidth, bitImgHight), 0, 0, bitImgWidth, bitImgHight, GraphicsUnit.Pixel);
 
-            try
-            {
-                graphics = Graphics.FromImage(partImg);
-            }
-            catch
-            {
-                var temp = partImg;
-                partImg = new Bitmap(partImg.Width, partImg.Height);
-                graphics = Graphics.FromImage(partImg);
-                graphics.DrawImage(temp, new Rectangle(0, 0, partImg.Width, partImg.Height), 0, 0, partImg.Width, partImg.Height, GraphicsUnit.Pixel);
+            var bg1 = new Rectangle(x, y, bgWidthTop, bgHeight); //center of page
+            var bg2 = new Rectangle(x, (bitImg.Height - bgHeight), bgWidthBottom, bgHeight); //bottom of page
 
-                var bg1 = new Rectangle(x, y, bgWidth, bgHeight); //center of page
-                var bg2 = new Rectangle(x, (partImg.Height - bgHeight), bgWidth, bgHeight); //bottom of page
+            graphics.FillRectangle(brushForBg, bg1);
+            graphics.FillRectangle(brushForBg, bg2);
 
+            temp.Dispose();
 
-
-                graphics.FillRectangle(brushForBg, bg1);
-                graphics.FillRectangle(brushForBg, bg2);
-
-
-                temp.Dispose();
-            }
 
             graphics.DrawString("OferAvnir", font, brushForText, textPoint1);
             graphics.DrawString("OferAvnir", font, brushForText, textPoint2);
 
+
             graphics.Dispose();
+            bitImg.Save(_imageSrcWm);
+            bitImg.Dispose();
 
-            partImg.Save(_diagramImageWmSaveAt);
+            Console.WriteLine(@"Image add watermark saved in folder:" + _imageSrcWm);
 
-            Console.WriteLine(@"Image saved in folder");
+
         }
 
 
 
- 
+
 
 
 
