@@ -8,6 +8,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace OemCrawler
 {
@@ -24,6 +25,7 @@ namespace OemCrawler
         private readonly string _imageSrcWm;
         private readonly string _imageSrcColorReplaced;
         private readonly string finalImageName = "image_final.jpeg";
+        
 
 
         public Services(string token)
@@ -33,6 +35,7 @@ namespace OemCrawler
             _diagramImageWmSaveAt = _SiteImagesFolder + "image_wm.jpeg";
             _imageSrcColorReplaced = _SiteImagesFolder + "image_color.jpeg";
             _imageSrcWm = _SiteImagesFolder + finalImageName;
+            
         }
 
         public string PostToApi(string apiUrl, string jsonString, string bearerToken)
@@ -145,7 +148,7 @@ namespace OemCrawler
             return isMappingExists;
         }
 
-        public Category CategoryInsert(string name, int parentId, string michlolImageUrl)
+        public Category CategoryInsert(string name, int parentId, string michlolImageUrl, string [] listColorsToReplace)
         {
 
             if (File.Exists(_diagramImageSaveAt))
@@ -176,8 +179,9 @@ namespace OemCrawler
                         client.DownloadFile(michlolImageUrl, _diagramImageSaveAt);
                     }
                 }
+
                 //replace watermark
-                SaveDiagramInFolder();
+                RemoveWatermarkAndSaveInFolder(listColorsToReplace);
 
                 if (addWatermark)
                 {
@@ -273,8 +277,11 @@ namespace OemCrawler
         }
 
 
-        public void SaveDiagramInFolder()
+        public void RemoveWatermarkAndSaveInFolder(string [] listColorsToReplace)
         {
+            
+            ConvertImageToGrayScale(_diagramImageSaveAt);
+
             Bitmap img;
             try
             {
@@ -286,63 +293,29 @@ namespace OemCrawler
                 Console.WriteLine(e);
             }
 
-            var colorsToReplace = new List<string>();
+            
 
             for (int y = 0; y < img.Height; y++)
             {
                 for (int x = 0; x < img.Width; x++)
                 {
-                    var color1 = img.GetPixel(x, y).Name;
+                    var colorName = img.GetPixel(x, y).Name;
 
-                    if (color1 == "ffffffff")
+                    if (colorName == "ffffffff") // if white skip
                     {
                         continue;
                     }
-                    
-                    
 
 
-                    if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#E4E4E4")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#E7E7E7")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffefefe")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffefefe")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffdfdfd")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffcfcfc")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffafafa")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff8f8f8")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff6f6f6")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff5f5f5")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff2f2f2")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff0f0f0")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffefefef")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffeeeeee")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffececec")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffebebeb")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffeaeaea")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe8e8e8")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe7e7e7")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe6e6e6")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe9e9e9")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff3f3f3")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff4f4f4")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff9f9f9")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fffbfbfb")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe4e4e4")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe5e5e5")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe3e3e3")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe2e2e2")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffe1e1e1")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff1f1f1")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#ffededed")) { img.SetPixel(x, y, Color.White); }
-                    else if (img.GetPixel(x, y) == ColorTranslator.FromHtml("#fff7f7f7")) { img.SetPixel(x, y, Color.White); }
-
-
-
+                    if (listColorsToReplace.Contains(colorName))
+                    {
+                        Console.WriteLine(colorName + " replaced");
+                        img.SetPixel(x, y, Color.White);
+                    }
                 }
 
+
             }
-
-
 
             img.Save(_imageSrcColorReplaced);
             img.Dispose();
@@ -409,6 +382,27 @@ namespace OemCrawler
 
 
 
+        private void ConvertImageToGrayScale(string imagePath)
+        {
+             
+
+            Bitmap img = (Bitmap)Image.FromFile(imagePath);
+
+            for (int i = 0; i < img.Width; i++)
+            {
+                for (int x = 0; x < img.Height; x++)
+                {
+                    Color oc = img.GetPixel(i, x);
+                    int grayScale = (int)((oc.R * 0.3) + (oc.G * 0.59) + (oc.B * 0.11));
+                    Color nc = Color.FromArgb(oc.A, grayScale, grayScale, grayScale);
+                    img.SetPixel(i, x, nc);
+                }
+            }
+
+            Console.WriteLine(@"Image converted to GrayScale.");
+            img.Save(imagePath);
+            img.Dispose();
+        }
 
 
 

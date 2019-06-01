@@ -56,13 +56,14 @@
             this.txtMakeGray = new System.Windows.Forms.TextBox();
             this.label9 = new System.Windows.Forms.Label();
             this.btnToGrayScale = new System.Windows.Forms.Button();
+            this.txtColorsListToReplace = new System.Windows.Forms.TextBox();
             this.SuspendLayout();
             // 
             // btnGo
             // 
-            this.btnGo.Location = new System.Drawing.Point(559, 120);
+            this.btnGo.Location = new System.Drawing.Point(607, 136);
             this.btnGo.Name = "btnGo";
-            this.btnGo.Size = new System.Drawing.Size(75, 31);
+            this.btnGo.Size = new System.Drawing.Size(75, 36);
             this.btnGo.TabIndex = 0;
             this.btnGo.Text = "Scrap";
             this.btnGo.UseVisualStyleBackColor = true;
@@ -70,7 +71,7 @@
             // 
             // txtUrl
             // 
-            this.txtUrl.Location = new System.Drawing.Point(15, 39);
+            this.txtUrl.Location = new System.Drawing.Point(15, 25);
             this.txtUrl.Multiline = true;
             this.txtUrl.Name = "txtUrl";
             this.txtUrl.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -97,7 +98,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(12, 23);
+            this.label2.Location = new System.Drawing.Point(12, 9);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(32, 13);
             this.label2.TabIndex = 5;
@@ -106,15 +107,15 @@
             // cmbCategory
             // 
             this.cmbCategory.FormattingEnabled = true;
-            this.cmbCategory.Location = new System.Drawing.Point(12, 131);
+            this.cmbCategory.Location = new System.Drawing.Point(15, 107);
             this.cmbCategory.Name = "cmbCategory";
-            this.cmbCategory.Size = new System.Drawing.Size(208, 21);
+            this.cmbCategory.Size = new System.Drawing.Size(238, 21);
             this.cmbCategory.TabIndex = 6;
             // 
             // label3
             // 
             this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(9, 115);
+            this.label3.Location = new System.Drawing.Point(12, 91);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(52, 13);
             this.label3.TabIndex = 7;
@@ -171,7 +172,7 @@
             // label5
             // 
             this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(260, 115);
+            this.label5.Location = new System.Drawing.Point(12, 136);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(69, 13);
             this.label5.TabIndex = 14;
@@ -179,14 +180,14 @@
             // 
             // txtModelYears
             // 
-            this.txtModelYears.Location = new System.Drawing.Point(263, 132);
+            this.txtModelYears.Location = new System.Drawing.Point(15, 153);
             this.txtModelYears.Name = "txtModelYears";
             this.txtModelYears.Size = new System.Drawing.Size(94, 20);
             this.txtModelYears.TabIndex = 15;
             // 
             // txtModelName
             // 
-            this.txtModelName.Location = new System.Drawing.Point(398, 131);
+            this.txtModelName.Location = new System.Drawing.Point(121, 153);
             this.txtModelName.Name = "txtModelName";
             this.txtModelName.Size = new System.Drawing.Size(132, 20);
             this.txtModelName.TabIndex = 17;
@@ -194,7 +195,7 @@
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(395, 114);
+            this.label6.Location = new System.Drawing.Point(118, 136);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(70, 13);
             this.label6.TabIndex = 16;
@@ -202,7 +203,7 @@
             // 
             // txtColorList
             // 
-            this.txtColorList.Location = new System.Drawing.Point(12, 458);
+            this.txtColorList.Location = new System.Drawing.Point(12, 519);
             this.txtColorList.Multiline = true;
             this.txtColorList.Name = "txtColorList";
             this.txtColorList.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -213,7 +214,7 @@
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(12, 405);
+            this.label7.Location = new System.Drawing.Point(12, 466);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(114, 13);
             this.label7.TabIndex = 19;
@@ -221,7 +222,7 @@
             // 
             // v
             // 
-            this.v.Location = new System.Drawing.Point(245, 458);
+            this.v.Location = new System.Drawing.Point(245, 519);
             this.v.Name = "v";
             this.v.Size = new System.Drawing.Size(75, 31);
             this.v.TabIndex = 20;
@@ -231,7 +232,7 @@
             // 
             // txtImagePath
             // 
-            this.txtImagePath.Location = new System.Drawing.Point(12, 421);
+            this.txtImagePath.Location = new System.Drawing.Point(12, 482);
             this.txtImagePath.Name = "txtImagePath";
             this.txtImagePath.Size = new System.Drawing.Size(308, 20);
             this.txtImagePath.TabIndex = 21;
@@ -239,7 +240,7 @@
             // 
             // txtDiagramTextUrl
             // 
-            this.txtDiagramTextUrl.Location = new System.Drawing.Point(337, 421);
+            this.txtDiagramTextUrl.Location = new System.Drawing.Point(337, 482);
             this.txtDiagramTextUrl.Name = "txtDiagramTextUrl";
             this.txtDiagramTextUrl.Size = new System.Drawing.Size(327, 20);
             this.txtDiagramTextUrl.TabIndex = 22;
@@ -247,7 +248,7 @@
             // 
             // btnWatermarkRemoveTest
             // 
-            this.btnWatermarkRemoveTest.Location = new System.Drawing.Point(589, 458);
+            this.btnWatermarkRemoveTest.Location = new System.Drawing.Point(589, 519);
             this.btnWatermarkRemoveTest.Name = "btnWatermarkRemoveTest";
             this.btnWatermarkRemoveTest.Size = new System.Drawing.Size(75, 31);
             this.btnWatermarkRemoveTest.TabIndex = 23;
@@ -258,7 +259,7 @@
             // label8
             // 
             this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(337, 405);
+            this.label8.Location = new System.Drawing.Point(337, 466);
             this.label8.Name = "label8";
             this.label8.Size = new System.Drawing.Size(126, 13);
             this.label8.TabIndex = 24;
@@ -266,7 +267,7 @@
             // 
             // txtColorListToReplace
             // 
-            this.txtColorListToReplace.Location = new System.Drawing.Point(340, 458);
+            this.txtColorListToReplace.Location = new System.Drawing.Point(340, 519);
             this.txtColorListToReplace.Multiline = true;
             this.txtColorListToReplace.Name = "txtColorListToReplace";
             this.txtColorListToReplace.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -276,7 +277,7 @@
             // 
             // txtMakeGray
             // 
-            this.txtMakeGray.Location = new System.Drawing.Point(15, 591);
+            this.txtMakeGray.Location = new System.Drawing.Point(12, 413);
             this.txtMakeGray.Name = "txtMakeGray";
             this.txtMakeGray.Size = new System.Drawing.Size(308, 20);
             this.txtMakeGray.TabIndex = 27;
@@ -285,7 +286,7 @@
             // label9
             // 
             this.label9.AutoSize = true;
-            this.label9.Location = new System.Drawing.Point(15, 575);
+            this.label9.Location = new System.Drawing.Point(12, 397);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(171, 13);
             this.label9.TabIndex = 26;
@@ -293,19 +294,30 @@
             // 
             // btnToGrayScale
             // 
-            this.btnToGrayScale.Location = new System.Drawing.Point(245, 617);
+            this.btnToGrayScale.Location = new System.Drawing.Point(326, 413);
             this.btnToGrayScale.Name = "btnToGrayScale";
-            this.btnToGrayScale.Size = new System.Drawing.Size(75, 31);
+            this.btnToGrayScale.Size = new System.Drawing.Size(75, 20);
             this.btnToGrayScale.TabIndex = 28;
             this.btnToGrayScale.Text = "GO";
             this.btnToGrayScale.UseVisualStyleBackColor = true;
             this.btnToGrayScale.Click += new System.EventHandler(this.BtnToGrayScale_Click);
             // 
+            // txtColorsListToReplace
+            // 
+            this.txtColorsListToReplace.Location = new System.Drawing.Point(289, 107);
+            this.txtColorsListToReplace.Multiline = true;
+            this.txtColorsListToReplace.Name = "txtColorsListToReplace";
+            this.txtColorsListToReplace.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtColorsListToReplace.Size = new System.Drawing.Size(145, 66);
+            this.txtColorsListToReplace.TabIndex = 29;
+            this.txtColorsListToReplace.Text = "Color list";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(700, 658);
+            this.ClientSize = new System.Drawing.Size(736, 658);
+            this.Controls.Add(this.txtColorsListToReplace);
             this.Controls.Add(this.btnToGrayScale);
             this.Controls.Add(this.txtMakeGray);
             this.Controls.Add(this.label9);
@@ -370,6 +382,7 @@
         private System.Windows.Forms.TextBox txtMakeGray;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.Button btnToGrayScale;
+        private System.Windows.Forms.TextBox txtColorsListToReplace;
     }
 }
 
