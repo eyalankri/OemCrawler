@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -152,7 +153,7 @@ namespace OemCrawler
             {
                 var a = li.FindElement(By.TagName("a"));
                 var href = a.GetAttribute("href");
-                var michName = a.Text;
+                var michName = li.FindElement(By.TagName("h2")).Text;
 
                 var michlol = new Michlol();
                 michlol.Name = michName;
@@ -451,8 +452,7 @@ namespace OemCrawler
 
         private void BtnGetColors_Click(object sender, EventArgs e)
         {
-
-
+            
             v.Text = "working...";
             txtColorList.Text = "";
 
@@ -474,18 +474,18 @@ namespace OemCrawler
                         {
                             Console.WriteLine(colorName + " - listed");
                             listColors.Add(colorName);
-                            txtColorList.Text += colorName + Environment.NewLine; ;
+                            txtColorList.Text += colorName + Environment.NewLine; 
                         }
                     }
                 }
 
-            }
+            }      
+            string projectDirectory = Directory.GetParent(Environment.CurrentDirectory).Parent.FullName;
+
+            var str = txtImagePath.Text + Environment.NewLine + txtColorList.Text;
+            File.WriteAllText(projectDirectory + "/" + "ColorsToReplace.txt", str);
             Console.WriteLine("Finished!");
-
-
-
-
-
+            
         }
  
 
@@ -511,11 +511,6 @@ namespace OemCrawler
                     img = (Bitmap)Image.FromFile(imagePath);
                     imagePathRes = txtDiagramTextUrl.Text.Replace(".", "_1."); 
                 }
-
-               
-                
-
-
 
                 var colorsToReplace = new List<string>();
 
